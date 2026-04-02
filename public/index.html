@@ -25,7 +25,7 @@
       padding: 2.5rem 3rem;
       max-width: 560px;
       width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
     }
 
     .logo {
@@ -35,20 +35,20 @@
       margin-bottom: 1.75rem;
     }
 
-    .logo svg { flex-shrink: 0; }
-
-    h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1.3;
-    }
+    h1 { font-size: 1.4rem; font-weight: 700; color: #fff; line-height: 1.3; }
 
     p.subtitle {
       color: #94a3b8;
       font-size: .92rem;
       margin-bottom: 2rem;
       line-height: 1.6;
+    }
+
+    p.subtitle code {
+      background: #2d2d44;
+      padding: .1em .35em;
+      border-radius: .25rem;
+      font-size: .88em;
     }
 
     /* Drop zone */
@@ -63,8 +63,7 @@
       position: relative;
     }
 
-    .drop-zone:hover,
-    .drop-zone.dragover {
+    .drop-zone:hover, .drop-zone.dragover {
       border-color: #6366f1;
       background: #1c1c36;
     }
@@ -78,15 +77,9 @@
       height: 100%;
     }
 
-    .drop-zone .icon {
-      font-size: 2.5rem;
-      margin-bottom: .75rem;
-    }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: .75rem; }
 
-    .drop-zone p {
-      color: #94a3b8;
-      font-size: .9rem;
-    }
+    .drop-zone p { color: #94a3b8; font-size: .9rem; }
 
     .drop-zone .filename {
       margin-top: .75rem;
@@ -98,7 +91,10 @@
 
     /* Button */
     .btn {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
       width: 100%;
       margin-top: 1.5rem;
       padding: .85rem;
@@ -142,14 +138,13 @@
 
     /* Spinner */
     .spinner {
-      display: none;
       width: 1.1rem;
       height: 1.1rem;
-      border: 2px solid rgba(255,255,255,.3);
+      border: 2px solid rgba(255,255,255,.35);
       border-top-color: #fff;
       border-radius: 50%;
       animation: spin .6s linear infinite;
-      margin: 0 auto;
+      display: none;
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -165,8 +160,7 @@
 <body>
   <div class="card">
     <div class="logo">
-      <!-- Simple arrow icon -->
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <rect width="40" height="40" rx="10" fill="#6366f1"/>
         <path d="M10 20h14M20 13l7 7-7 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
@@ -176,22 +170,22 @@
     <p class="subtitle">
       Upload your Postman collection export (<code>.json</code>) and we'll
       convert it to a Hoppscotch-compatible collection file — ready to import
-      straight away.
+      with <strong>Import from Hoppscotch</strong>.
     </p>
 
     <div class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" accept=".json" />
+      <input type="file" id="fileInput" accept=".json" aria-label="Select Postman JSON file" />
       <div class="icon">📂</div>
       <p>Drag &amp; drop your Postman JSON here<br/>or click to browse</p>
-      <div class="filename" id="fileName"></div>
+      <div class="filename" id="fileName" aria-live="polite"></div>
     </div>
 
     <button class="btn" id="convertBtn" disabled>
       <span id="btnText">Convert &amp; Download</span>
-      <div class="spinner" id="spinner"></div>
+      <div class="spinner" id="spinner" aria-hidden="true"></div>
     </button>
 
-    <div class="status" id="status"></div>
+    <div class="status" id="status" role="alert" aria-live="polite"></div>
 
     <footer>Supports Postman Collection v2 and v2.1 exports.</footer>
   </div>
@@ -215,15 +209,17 @@
       statusEl.textContent = '';
     }
 
+    function onFileSelected(file) {
+      if (!file) return;
+      fileNameEl.textContent = file.name;
+      convertBtn.disabled = false;
+      clearStatus();
+    }
+
     fileInput.addEventListener('change', () => {
-      if (fileInput.files.length > 0) {
-        fileNameEl.textContent = fileInput.files[0].name;
-        convertBtn.disabled = false;
-        clearStatus();
-      }
+      if (fileInput.files.length > 0) onFileSelected(fileInput.files[0]);
     });
 
-    // Drag-and-drop visual feedback
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('dragover');
@@ -234,13 +230,10 @@
       dropZone.classList.remove('dragover');
       const file = e.dataTransfer.files[0];
       if (file) {
-        // Create a DataTransfer to set files on the input
         const dt = new DataTransfer();
         dt.items.add(file);
         fileInput.files = dt.files;
-        fileNameEl.textContent = file.name;
-        convertBtn.disabled = false;
-        clearStatus();
+        onFileSelected(file);
       }
     });
 
@@ -250,17 +243,13 @@
       const formData = new FormData();
       formData.append('file', fileInput.files[0]);
 
-      // Loading state
       convertBtn.disabled = true;
       btnText.style.display = 'none';
       spinner.style.display = 'block';
       clearStatus();
 
       try {
-        const response = await fetch('/convert', {
-          method: 'POST',
-          body: formData,
-        });
+        const response = await fetch('/convert', { method: 'POST', body: formData });
 
         if (!response.ok) {
           const data = await response.json().catch(() => ({ error: 'Unknown server error.' }));
@@ -268,7 +257,6 @@
           return;
         }
 
-        // Trigger file download from the response blob
         const blob = await response.blob();
         const disposition = response.headers.get('Content-Disposition') || '';
         const match = disposition.match(/filename[^;=\n]*=(?:(['"])(.+?)\1|([^;\n]*))/);
