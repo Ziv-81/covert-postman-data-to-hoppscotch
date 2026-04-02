@@ -170,6 +170,7 @@ function convertAuth(authObj) {
   }
 
   // oauth1, digest, hawk, ntlm, awsv4, edgegrid — not supported by Hoppscotch
+  console.warn(`[converter] "${authType}" auth cannot be converted (not supported by Hoppscotch); set to none.`);
   return { authType: 'none', authActive: true };
 }
 
@@ -233,6 +234,8 @@ function convertBody(bodyObj) {
 
   if (mode === 'file') {
     // Single-file upload — Hoppscotch has no equivalent; use empty body
+    const src = bodyObj.file?.src || '';
+    console.warn(`[converter] "file" body mode cannot be fully converted (file: ${src}); set to empty body.`);
     return { contentType: null, body: null };
   }
 
