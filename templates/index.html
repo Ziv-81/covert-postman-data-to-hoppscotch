@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Postman → Hoppscotch Converter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #1e1e2e;
+      border: 1px solid #2d2d44;
+      border-radius: 1rem;
+      padding: 2.5rem 3rem;
+      max-width: 560px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .logo svg { flex-shrink: 0; }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    p.subtitle {
+      color: #94a3b8;
+      font-size: .92rem;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #3b3b5c;
+      border-radius: .75rem;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: #16162a;
+      position: relative;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: #6366f1;
+      background: #1c1c36;
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-zone .icon {
+      font-size: 2.5rem;
+      margin-bottom: .75rem;
+    }
+
+    .drop-zone p {
+      color: #94a3b8;
+      font-size: .9rem;
+    }
+
+    .drop-zone .filename {
+      margin-top: .75rem;
+      font-size: .85rem;
+      color: #6366f1;
+      font-weight: 600;
+      word-break: break-all;
+    }
+
+    /* Button */
+    .btn {
+      display: block;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: .85rem;
+      border: none;
+      border-radius: .65rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+
+    .btn:hover { opacity: .9; }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* Status */
+    .status {
+      margin-top: 1.25rem;
+      padding: .85rem 1rem;
+      border-radius: .65rem;
+      font-size: .88rem;
+      font-weight: 500;
+      display: none;
+    }
+
+    .status.error {
+      background: #2d1b1b;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      display: block;
+    }
+
+    .status.success {
+      background: #162d1b;
+      border: 1px solid #14532d;
+      color: #86efac;
+      display: block;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: none;
+      width: 1.1rem;
+      height: 1.1rem;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer {
+      margin-top: 2rem;
+      font-size: .78rem;
+      color: #4a4a6a;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <!-- Simple arrow icon -->
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="10" fill="#6366f1"/>
+        <path d="M10 20h14M20 13l7 7-7 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>Postman → Hoppscotch<br/>Converter</h1>
+    </div>
+
+    <p class="subtitle">
+      Upload your Postman collection export (<code>.json</code>) and we'll
+      convert it to a Hoppscotch-compatible collection file — ready to import
+      straight away.
+    </p>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".json" />
+      <div class="icon">📂</div>
+      <p>Drag &amp; drop your Postman JSON here<br/>or click to browse</p>
+      <div class="filename" id="fileName"></div>
+    </div>
+
+    <button class="btn" id="convertBtn" disabled>
+      <span id="btnText">Convert &amp; Download</span>
+      <div class="spinner" id="spinner"></div>
+    </button>
+
+    <div class="status" id="status"></div>
+
+    <footer>Supports Postman Collection v2 and v2.1 exports.</footer>
+  </div>
+
+  <script>
+    const dropZone   = document.getElementById('dropZone');
+    const fileInput  = document.getElementById('fileInput');
+    const fileNameEl = document.getElementById('fileName');
+    const convertBtn = document.getElementById('convertBtn');
+    const btnText    = document.getElementById('btnText');
+    const spinner    = document.getElementById('spinner');
+    const statusEl   = document.getElementById('status');
+
+    function showStatus(type, msg) {
+      statusEl.className = 'status ' + type;
+      statusEl.textContent = msg;
+    }
+
+    function clearStatus() {
+      statusEl.className = 'status';
+      statusEl.textContent = '';
+    }
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        fileNameEl.textContent = fileInput.files[0].name;
+        convertBtn.disabled = false;
+        clearStatus();
+      }
+    });
+
+    // Drag-and-drop visual feedback
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        // Create a DataTransfer to set files on the input
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileNameEl.textContent = file.name;
+        convertBtn.disabled = false;
+        clearStatus();
+      }
+    });
+
+    convertBtn.addEventListener('click', async () => {
+      if (!fileInput.files.length) return;
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      // Loading state
+      convertBtn.disabled = true;
+      btnText.style.display = 'none';
+      spinner.style.display = 'block';
+      clearStatus();
+
+      try {
+        const response = await fetch('/convert', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({ error: 'Unknown server error.' }));
+          showStatus('error', '❌ ' + (data.error || 'Conversion failed.'));
+          return;
+        }
+
+        // Trigger file download from the response blob
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename[^;=\n]*=(?:(['"])(.+?)\1|([^;\n]*))/);
+        const downloadName = (match && (match[2] || match[3])) || 'hoppscotch_collection.json';
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = downloadName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        showStatus('success', '✅ Conversion successful! Your download should start automatically.');
+      } catch (err) {
+        showStatus('error', '❌ Network error: ' + err.message);
+      } finally {
+        convertBtn.disabled = false;
+        btnText.style.display = '';
+        spinner.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
