@@ -32,6 +32,21 @@ const upload = multer({
   },
 });
 
+function buildContentDisposition(filename) {
+  // HTTP headers must be ASCII/latin1-safe. Keep filename for legacy clients
+  // and add RFC 5987 filename* for full UTF-8 filenames.
+  const safeFallback = filename
+    .replace(/[^\x20-\x7E]/g, '_')
+    .replace(/["\\]/g, '_');
+  const encoded = encodeURIComponent(filename);
+  return `attachment; filename="${safeFallback}"; filename*=UTF-8''${encoded}`;
+}
+
+function normalizeUploadFilename(filename) {
+  // Multer exposes multipart filename as latin1; decode to UTF-8 for non-ASCII names.
+  return Buffer.from(filename || '', 'latin1').toString('utf8');
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────
 
 app.post('/convert', convertLimiter, upload.single('file'), (req, res) => {
@@ -57,12 +72,13 @@ app.post('/convert', convertLimiter, upload.single('file'), (req, res) => {
   const result = convertCollection(postmanData);
   const output = JSON.stringify([result], null, 2);
 
-  const baseName = path.basename(req.file.originalname, '.json');
+  const originalName = normalizeUploadFilename(req.file.originalname);
+  const baseName = path.basename(originalName, '.json');
   const downloadName = `${baseName}_hoppscotch.json`;
 
   res.set({
     'Content-Type': 'application/json',
-    'Content-Disposition': `attachment; filename="${downloadName}"`,
+    'Content-Disposition': buildContentDisposition(downloadName),
   });
   res.send(output);
 });

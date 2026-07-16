@@ -105,6 +105,18 @@ describe('POST /convert', () => {
     expect(res.headers['content-disposition']).toContain('my_collection_hoppscotch.json');
   });
 
+  test('unicode filename is returned via filename* without header errors', async () => {
+    const res = await request(app)
+      .post('/convert')
+      .attach('file', Buffer.from(JSON.stringify(VALID_COLLECTION)), {
+        filename: 'CGTrust 2.0.0 文化部退輔會.postman_collection.json',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain("filename*=UTF-8''");
+    expect(res.headers['content-disposition']).toContain('%E6%96%87%E5%8C%96%E9%83%A8');
+  });
+
   test('variables ({{var}}) are converted to <<var>> in endpoint', async () => {
     const col = {
       info: { name: 'VarTest', schema: '' },
